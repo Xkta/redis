@@ -294,7 +294,7 @@ proc spawn_server {config_file stdout stderr args} {
         # ASAN_OPTIONS environment variable is for address sanitizer. If a test
         # tries to allocate huge memory area and expects allocator to return
         # NULL, address sanitizer throws an error without this setting.
-        set pid [exec /usr/bin/env ASAN_OPTIONS=allocator_may_return_null=1 {*}$cmd >> $stdout 2>> $stderr &]
+        set pid [exec /usr/bin/env ASAN_OPTIONS=allocator_may_return_null=1 MSAN_OPTIONS=allocator_may_return_null=1 {*}$cmd >> $stdout 2>> $stderr &]
     }
 
     if {$::wait_server} {
@@ -729,11 +729,6 @@ proc start_server {options {code undefined}} {
 
         # fetch srv back from the server list, in case it was restarted by restart_server (new PID)
         set srv [lindex $::servers end]
-
-        # Don't do the leak check when no tests were run
-        if {$num_tests == $::num_tests} {
-            dict set srv "skipleaks" 1
-        }
 
         # pop the server object
         set ::servers [lrange $::servers 0 end-1]
