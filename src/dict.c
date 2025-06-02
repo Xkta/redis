@@ -65,6 +65,8 @@ typedef struct {
 } dictEntryNoValue;
 
 /* -------------------------- private prototypes ---------------------------- */
+/* 这些都是私有函数声明（private prototypes），它们在 Redis 的字典（dict）
+ * 实现中作为内部辅助函数使用。*/
 
 static int _dictExpandIfNeeded(dict *d);
 static void _dictShrinkIfNeeded(dict *d);
@@ -88,12 +90,19 @@ int64_t dictIncrSignedIntegerVal(dictEntry *de, int64_t val);
 
 /* -------------------------- misc inline functions -------------------------------- */
 
+/* 定义了一个名为 keyCmpFunc 的函数指针 */
 typedef int (*keyCmpFunc)(dictCmpCache *cache, const void *key1, const void *key2);
+
+/* 根据dict结构体的状态，返回一个合适的键比较函数，用于字典（dict）键的比较操作。 */
 static inline keyCmpFunc dictGetCmpFunc(dict *d) {
+    // 如果这个字典启用了“存储键API”(useStoredKeyApi为真)，
+    // 并且type结构体中定义了storedKeyCompare比较函数，那么优先返回这个storedKeyCompare函数指针。
     if (d->useStoredKeyApi && d->type->storedKeyCompare)
         return d->type->storedKeyCompare;
+    // 如果没有满足上一个条件，但type结构体里定义了普通的keyCompare比较函数，则返回它。
     if (d->type->keyCompare)
         return d->type->keyCompare;
+    // 如果以上都不满足，说明没有自定义的比较函数，则返回一个默认的比较函数dictDefaultCompare。
     return dictDefaultCompare;
 }
 
@@ -125,12 +134,24 @@ uint64_t dictGenHashFunction(const void *key, size_t len) {
 uint64_t dictGenCaseHashFunction(const unsigned char *buf, size_t len) {
     return siphash_nocase(buf,len,dict_hash_function_seed);
 }
+/* ---- 上面
+ * dict_hash_function_seed 是一个16字节的全局数组，用作哈希函数的密钥（seed）。
+ * 通过 dictSetHashFunctionSeed 可设置（更新）该种子，确保哈希函数的输出受密钥影响，提升安全性（防止哈希冲突攻击）。
+ * siphash 和 siphash_nocase 都是哈希算法，底层实现见 siphash.c。
+ * siphash：区分大小写的哈希。
+ * siphash_nocase：不区分大小写的哈希。---- */
 
 /* --------------------- dictEntry pointer bit tricks ----------------------  */
 
 /* The 3 least significant bits in a pointer to a dictEntry determines what the
  * pointer actually points to. If the least bit is set, it's a key. Otherwise,
- * the bit pattern of the least 3 significant bits mark the kind of entry. */
+ * the bit pattern of the least 3 significant bits mark the kind of entry. 
+ * 通过最低 3 位（ENTRY_PTR_MASK，0b111），判断指针的实际含义。
+ * 定义了几种类型：
+ * ENTRY_PTR_NORMAL (0)：普通的 dictEntry*，指向有 value 的 entry。
+ * ENTRY_PTR_IS_ODD_KEY (1)、ENTRY_PTR_IS_EVEN_KEY (2/4)：特殊的键指针。
+ * ENTRY_PTR_NO_VALUE (4)：指向没有 value 字段的 entry（比如只存 key，节省内存）。
+ */
 
 #define ENTRY_PTR_MASK        7 /* 111 */
 #define ENTRY_PTR_NORMAL      0 /* 000 : If a pointer to an entry with value. */
@@ -183,6 +204,10 @@ static inline dictEntryNoValue *decodeEntryNoValue(const dictEntry *de) {
 static inline int entryHasValue(const dictEntry *de) {
     return entryIsNormal(de);
 }
+/* ----- 上面
+ * C 语言中的指针通常是对齐的（比如 8 字节对齐），
+ * 这意味着指针的最低几位经常都是 0。Redis 利用这些“空闲位”存储额外信息，而无需额外的内存空间。
+ * 这是一种常用的内存优化技巧，叫指针打标记（pointer tagging）。---- */
 
 /* ----------------------------- API implementation ------------------------- */
 
