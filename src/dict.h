@@ -120,19 +120,28 @@ typedef struct dictType {
 #define DICTHT_SIZE_MASK(exp) ((exp) == -1 ? 0 : (DICTHT_SIZE(exp))-1)
 
 struct dict {
+    // 指向一个描述“字典行为”的结构体，比如哈希函数、比较函数、释放函数等。允许不同类型的字典有不同的行为（策略模式）。
     dictType *type;
 
+    // 字典的核心数据区，是两个哈希表的指针数组。Redis 字典支持渐进式rehash，在rehash过程中，数据会从ht_table[0]迁移到ht_table[1]。平时只用ht_table[0]，rehash时两个都用。
     dictEntry **ht_table[2];
+    // 记录哈希表中已用的节点数，分别对应ht_table[0]和ht_table[1]。
     unsigned long ht_used[2];
 
+    // rehash进度指针。如果等于-1，表示没有在rehash；否则表示已经迁移到的桶的索引。
     long rehashidx; /* rehashing not in progress if rehashidx == -1 */
 
     /* Keep small vars at end for optimal (minimal) struct padding */
+    // 位域，表示rehash是否被暂停，大于0暂停。只用15位（节省空间）。
     unsigned pauserehash : 15; /* If >0 rehashing is paused */
 
+    // 位域，1位，表示是否启用特殊的“存储键API”。
     unsigned useStoredKeyApi : 1; /* See comment of storedHashFunction above */
+    // 记录哈希表大小的指数（exp），即实际大小为1 << exp。比如exp=10，表大小为1024
     signed char ht_size_exp[2]; /* exponent of size. (size = 1<<exp) */
+    // 是否暂停自动扩容/缩容。大于0时禁止自动resize。
     int16_t pauseAutoResize;  /* If >0 automatic resizing is disallowed (<0 indicates coding error) */
+    // 灵活的扩展字段，变长数组，用于存放与字典关联的额外元数据。·     典型用法是根据不同dictType存储自定义数据。
     void *metadata[];
 };
 
