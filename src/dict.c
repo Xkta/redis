@@ -43,6 +43,11 @@ static dictResizeEnable dict_can_resize = DICT_RESIZE_ENABLE;
 static unsigned int dict_force_resize_ratio = 4;
 
 /* -------------------------- types ----------------------------------------- */
+/* Hash的作用是将key计算为index，在数组中有了index就能很快计算内存地址，以找到对应存储内容
+ * 该结构体是 Redis 字典（哈希表）底层每个节点的核心数据结构。
+ * 通过联合体，既可以高效存储指针类型值，也能直接存储数字类型，提高灵活性和性能。
+ * 通过链表实现哈希冲突处理。*/
+
 struct dictEntry {
     void *key;
     union {
